@@ -1,5 +1,9 @@
 import re
 
+#____________________________TASK_1____________________________
+
+print("____TASK_1____")
+
 log_lines = [
     "2024-01-15 10:02:11 INFO Server started on port 8080",
     "2024-01-15 10:03:47 ERROR Failed to connect to database",
@@ -56,3 +60,38 @@ for line in lines_with_url:
 
 print("\n6. Format validation (log_lines[0]):")
 print("   Matches expected format:", is_first_line_valid)
+
+
+#____________________________TASK_2____________________________
+
+def reverse_complement(sequence: str) -> str:
+    return sequence.translate(str.maketrans("ATCGatcg", "TAGCtagc"))[::-1]
+
+
+class SequencingRead:
+    def __init__(self, read_id: str, sequence: str):
+        self.read_id = read_id
+        self.sequence = sequence
+
+    def matches_mid_pair(self, forward_mid: str, reverse_mid: str) -> bool:
+        rev_comp = reverse_complement(reverse_mid)
+        return bool(re.search(f"^{re.escape(forward_mid)}.*{re.escape(rev_comp)}$", self.sequence))
+
+    def trim_mid_pair(self, forward_mid: str, reverse_mid: str) -> str | None:
+        rev_comp = reverse_complement(reverse_mid)
+        match = re.search(f"^{re.escape(forward_mid)}(.*){re.escape(rev_comp)}$", self.sequence)
+        return match.group(1) if match else None
+
+    def describe(self) -> str:
+        return f"SequencingRead {self.read_id} ({len(self.sequence)} bp)"
+
+
+print("___TASK_2___")
+r1 = SequencingRead("demo_1", "AGCTTCGA" + "N" * 20 + reverse_complement("TGCAGGTC"))
+print(r1.describe())
+print(r1.matches_mid_pair("AGCTTCGA", "TGCAGGTC"))  # True
+print(r1.matches_mid_pair("CGATCGAT", "GCTAGCTA"))  # False
+print(r1.trim_mid_pair("AGCTTCGA", "TGCAGGTC"))     # 20 x "N"
+
+
+
