@@ -1,4 +1,8 @@
 import re
+import csv
+import gzip
+import os
+from Bio import SeqIO
 
 #____________________________TASK_1____________________________
 
@@ -95,3 +99,63 @@ print(r1.trim_mid_pair("AGCTTCGA", "TGCAGGTC"))     # 20 x "N"
 
 
 
+
+
+# ____________________________TASK_3____________________________
+class Demultiplexer:
+
+    def __init__(self, fasta_path: str, mid_table_path: str):
+        self.reads: list[SequencingRead] = []
+        with gzip.open(fasta_path, "rt") as handle:
+            for record in SeqIO.parse(handle, "fasta"):
+                self.reads.append(SequencingRead(record.id, str(record.seq)))
+
+        self.samples: list[tuple[str, str, str]] = []
+        self.assigned: dict[str, list[SequencingRead]] = {}
+        with open(mid_table_path, mode="r", encoding="utf-8") as handle:
+            reader = csv.DictReader(handle, delimiter=";")
+            for row in reader:
+                label = f"{row['SampleID']}_{row['Description']}"
+                f_mid = row["FBarcodeSequence"]
+                r_mid = row["RBarcodeSequence"]
+                self.samples.append((label, f_mid, r_mid))
+                self.assigned[label] = []
+
+        self.unassigned: list[SequencingRead] = []
+
+    def assign_reads(self) -> None:
+        for read in self.reads:
+            matched = False
+            for label, f_mid, r_mid in self.samples:
+                trimmed = read.trim_mid_pair(f_mid, r_mid)
+                if trimmed is None:
+                    trimmed = read.trim_mid_pair(r_mid, f_mid)
+                if trimmed is not None:
+                    self.assigned[label].append(
+                        SequencingRead(read.read_id, trimmed))
+                    matched = True
+                    break
+            if not matched:
+                self.unassigned.append(read)
+
+    def report(self) -> str:
+        lines = [
+            f"{label}\t{len(reads)}" for label, reads in self.assigned.items()]
+        lines.append(f"unassigned\t{len(self.unassigned)}")
+        return "\n".join(lines)
+
+    def write_fasta(self, output_dir: str) -> None:
+        os.makedirs(output_dir, exist_ok=True)
+        for label, reads in self.assigned.items():
+            if reads:
+                file_path = os.path.join(output_dir, f"{label}.fasta")
+                with open(file_path, "w", encoding="utf-8") as handle:
+                    for read in reads:
+                        handle.write(f">{read.read_id}\n{read.sequence}\n")
+
+
+print("___TASK_3___")
+demux = Demultiplexer("fishes.fna.gz", "fishes_MIDs.csv")
+demux.assign_reads()
+print(demux.report())
+demux.write_fasta("demux_output")
